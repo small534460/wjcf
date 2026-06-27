@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>函数棋 · 完整AI对战</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #f5f5f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 900px;
+      height: 700px;
+      background: #ffffff;
+      border-radius: 0;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 2px solid #ccc;
+    }
+    #main-view {
+      position: relative;
+      flex: 1;
+      background: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    canvas#mainCanvas {
+      display: block;
+      background: #fdfdfd;
+      border: 1px solid #bbb;
+      border-radius: 0;
+      box-shadow: 2px 2px 12px rgba(0,0,0,0.1);
+    }
+    #minimap-container {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      width: 180px;
+      height: 180px;
+      background: rgba(255,255,255,0.9);
+      border: 2px solid #999;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 10;
+    }
+    canvas#minimapCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #control-bar {
+      height: 70px;
+      background: #f0f0e8;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      border-top: 2px solid #ccc;
+      z-index: 20;
+      position: relative;
+    }
+    .btn {
+      background: #e0dcd0;
+      border: 1px solid #999;
+      color: #333;
+      font-size: 20px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 1px 2px 4px rgba(0,0,0,0.1);
+      padding: 0 16px;
+      height: 48px;
+    }
+    .btn:hover {
+      background: #d4cfc0;
+      border-color: #666;
+    }
+    .btn:active {
+      background: #c8c0ac;
+      transform: translateY(2px);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      background: #e0dcd0;
+    }
+    #function-input {
+      flex: 1;
+      height: 48px;
+      background: #ffffff;
+      border: 2px solid #999;
+      border-radius: 8px;
+      color: #222;
+      font-size: 20px;
+      font-family: 'Courier New', monospace;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    #fire-btn {
+      background: #d97706;
+      border-color: #b45309;
+      color: white;
+      font-size: 22px;
+      min-width: 90px;
+    }
+    #fire-btn:hover {
+      background: #f59e0b;
+    }
+    #keypad-panel {
+      position: absolute;
+      bottom: 70px;
+      left: 0;
+      right: 0;
+      background: #f8f8f4;
+      border-top: 2px solid #ccc;
+      padding: 15px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s;
+      transform: translateY(100%);
+      opacity: 0;
+      z-index: 25;
+      box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
+      max-height: 250px;
+      overflow-y: auto;
+      pointer-events: none;
+    }
+    #keypad-panel.show {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .key-btn {
+      background: #ffffff;
+      border: 1px solid #aaa;
+      color: #222;
+      font-size: 20px;
+      font-weight: 600;
+      min-width: 55px;
+      height: 45px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.1s;
+      box-shadow: 1px 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+    }
+    .key-btn.wide {
+      min-width: 70px;
+    }
+    .key-btn:hover {
+      background: #f0ece0;
+      border-color: #666;
+    }
+    .key-btn:active {
+      background: #e0dac8;
+      transform: scale(0.95);
+    }
+    .key-btn.special {
+      background: #6b21a8;
+      border-color: #4c1d95;
+      color: white;
+    }
+    .key-btn.special:hover {
+      background: #8b5cf6;
+    }
+    #info-panel {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(4px);
+      padding: 10px 16px;
+      border-radius: 8px;
+      color: #222;
+      font-weight: bold;
+      font-size: 15px;
+      z-index: 10;
+      border: 1px solid #bbb;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .hp-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #turn-indicator {
+      position: absolute;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.9);
+      color: #333;
+      padding: 6px 24px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      z-index: 15;
+      letter-spacing: 1px;
+      pointer-events: none;
+      border: 1px solid #aaa;
+    }
+    #mouse-coords {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+<div id="game-container">
+  <div id="main-view">
+    <canvas id="mainCanvas" width="800" height="600"></canvas>
+    <div id="info-panel">
+      <div>👤 玩家 HP: <span id="player-hp-text">5/5</span></div>
+      <div id="enemy-hp-list"></div>
+      <div id="mouse-coords">鼠标坐标: (0, 0)</div>
+    </div>
+    <div id="minimap-container">
+      <canvas id="minimapCanvas" width="180" height="180"></canvas>
+    </div>
+    <div id="turn-indicator">🔵 你的回合</div>
+  </div>
+
+  <div id="control-bar">
+    <button class="btn" id="toggle-keypad" title="弹出/收起函数输入面板">△</button>
+    <div id="function-input">y =</div>
+    <button class="btn" id="fire-btn">🚀 发射!</button>
+  </div>
+
+  <div id="keypad-panel"></div>
+</div>
+
+<script>
+  (function() {
+    const WORLD_MIN = -50;
+    const WORLD_MAX = 50;
+    const WORLD_SIZE = WORLD_MAX - WORLD_MIN;
+
+    const DEFAULT_VIEW_W = 20;
+    const DEFAULT_VIEW_H = 15;
+    const MIN_VIEW_W = 5;
+    const MAX_VIEW_W = 80;
+
+    const PLAYER_MAX_HP = 5;
+    const ENEMY_MAX_HP = 2;
+    const CURVE_HIT_WIDTH = 0.5;
+    const CHAR_RADIUS = 0.35;
+    const CURVE_SAMPLE_STEP = 0.2;
+
+    const MAIN_CANVAS_WIDTH = 800;
+    const MAIN_CANVAS_HEIGHT = 600;
+
+    const mainCanvas = document.getElementById('mainCanvas');
+    const mainCtx = mainCanvas.getContext('2d');
+    const minimapCanvas = document.getElementById('minimapCanvas');
+    const minimapCtx = minimapCanvas.getContext('2d');
+    const functionInputDiv = document.getElementById('function-input');
+    const fireBtn = document.getElementById('fire-btn');
+    const toggleKeypadBtn = document.getElementById('toggle-keypad');
+    const keypadPanel = document.getElementById('keypad-panel');
+    const turnIndicator = document.getElementById('turn-indicator');
+    const playerHpText = document.getElementById('player-hp-text');
+    const enemyHpListDiv = document.getElementById('enemy-hp-list');
+    const mouseCoordsDiv = document.getElementById('mouse-coords');
+
+    let player = {
+      x: 0, y: 0,
+      hp: PLAYER_MAX_HP,
+      maxHp: PLAYER_MAX_HP,
+      type: 'player',
+      alive: true
+    };
+    let enemies = [];
+    let obstacles = [];
+    let currentTurnIndex = -1;
+    let turnOrder = [];
+    let viewW = DEFAULT_VIEW_W;
+    let viewH = DEFAULT_VIEW_H;
+    let originPixelX = MAIN_CANVAS_WIDTH / 2;
+    let originPixelY = MAIN_CANVAS_HEIGHT / 2;
+    let currentExpression = '';
+    let activeCurve = null;
+    let curveTimer = null;
+    let gameOver = false;
+
+    let isDragging = false;
+    let dragStartMouseX = 0, dragStartMouseY = 0;
+    let dragStartOriginX = 0, dragStartOriginY = 0;
+
+    const keyChars = [
+      ['7','8','9','/','sin','cos','tan'],
+      ['4','5','6','*','log','ln','√'],
+      ['1','2','3','-','(',')','|'],
+      ['0','.','x','y','+','^'],
+      ['⌫','C']
+    ];
+
+    function buildKeypad() {
+      keypadPanel.innerHTML = '';
+      keyChars.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.style.display = 'flex';
+        rowDiv.style.gap = '8px';
+        rowDiv.style.flexWrap = 'wrap';
+        rowDiv.style.justifyContent = 'center';
+        row.forEach(char => {
+          const btn = document.createElement('button');
+          btn.className = 'key-btn';
+          if (char === '⌫' || char === 'C') btn.classList.add('special');
+          if (['sin','cos','tan','log','ln'].includes(char)) btn.classList.add('wide');
+          btn.textContent = char;
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleKeypadInput(char);
+          });
+          rowDiv.appendChild(btn);
+        });
+        keypadPanel.appendChild(rowDiv);
+      });
+    }
+
+    function handleKeypadInput(char) {
+      if (gameOver || currentTurnIndex !== 0) return;
+      if (char === '⌫') currentExpression = currentExpression.slice(0, -1);
+      else if (char === 'C') currentExpression = '';
+      else currentExpression += char;
+      updateInputDisplay();
+    }
+
+    function updateInputDisplay() {
+      functionInputDiv.textContent = 'y = ' + currentExpression;
+      functionInputDiv.scrollLeft = functionInputDiv.scrollWidth;
+    }
+
+    function clearInput() {
+      currentExpression = '';
+      updateInputDisplay();
+    }
+
+    function parseExpression(exprStr) {
+      let processed = exprStr.replace(/\|([^|]+)\|/g, 'abs($1)');
+      processed = processed.replace(/\^/g, '**');
+      processed = processed.replace(/sin/g, 'Math.sin');
+      processed = processed.replace(/cos/g, 'Math.cos');
+      processed = processed.replace(/tan/g, 'Math.tan');
+      processed = processed.replace(/log/g, 'Math.log10');
+      processed = processed.replace(/ln/g, 'Math.log');
+      processed = processed.replace(/√/g, 'Math.sqrt');
+      processed = processed.replace(/abs/g, 'Math.abs');
+      try {
+        return new Function('x', `return (${processed});`);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function isInsideObstacle(worldX, worldY) {
+      for (let obs of obstacles) {
+        if (!obs.alive) continue;
+        if (worldX >= obs.x && worldX <= obs.x + obs.w &&
+            worldY >= obs.y && worldY <= obs.y + obs.h) {
+          return obs;
+        }
+      }
+      return null;
+    }
+
+    function sampleCurveWithObstacles(exprFunc, originRole) {
+      const points = [];
+      const destroyed = [];
+      let stopped = false;
+      for (let x = WORLD_MIN; x <= WORLD_MAX; x += CURVE_SAMPLE_STEP) {
+        if (stopped) break;
+        try {
+          const y = exprFunc(x);
+          if (!isFinite(y) || isNaN(y)) continue;
+          if (y < WORLD_MIN || y > WORLD_MAX) continue;
+          const worldX = originRole.x + x;
+          const worldY = originRole.y + y;
+          const hitObs = isInsideObstacle(worldX, worldY);
+          if (hitObs) {
+            hitObs.alive = false;
+            destroyed.push(hitObs);
+            points.push({x, y});
+            stopped = true;
+            break;
+          }
+          points.push({x, y});
+        } catch (e) {}
+      }
+      return { points, destroyed };
+    }
+
+    function distancePointToCurve(px, py, sampledPoints) {
+      let minDist = Infinity;
+      for (let i = 0; i < sampledPoints.length - 1; i++) {
+        const p1 = sampledPoints[i];
+        const p2 = sampledPoints[i+1];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const lenSq = dx*dx + dy*dy;
+        if (lenSq === 0) {
+          const d = Math.hypot(px - p1.x, py - p1.y);
+          if (d < minDist) minDist = d;
+          continue;
+        }
+        let t = ((px - p1.x)*dx + (py - p1.y)*dy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+        const projX = p1.x + t * dx;
+        const projY = p1.y + t * dy;
+        const d = Math.hypot(px - projX, py - projY);
+        if (d < minDist) minDist = d;
+      }
+      return minDist;
+    }
+
+    function getCurrentOrigin() {
+      if (!turnOrder.length || currentTurnIndex < 0) return {x: 0, y: 0};
+      return turnOrder[currentTurnIndex];
+    }
+
+    function worldToCanvas(worldX, worldY, origin) {
+      const localX = worldX - origin.x;
+      const localY = worldY - origin.y;
+      const scaleX = MAIN_CANVAS_WIDTH / viewW;
+      const scaleY = MAIN_CANVAS_HEIGHT / viewH;
+      return {
+        x: originPixelX + localX * scaleX,
+        y: originPixelY - localY * scaleY
+      };
+    }
+
+    function canvasToWorld(canvasX, canvasY, origin) {
+      const scaleX = MAIN_CANVAS_WIDTH / viewW;
+      const scaleY = MAIN_CANVAS_HEIGHT / viewH;
+      const localX = (canvasX - originPixelX) / scaleX;
+      const localY = (originPixelY - canvasY) / scaleY;
+      return { x: origin.x + localX, y: origin.y + localY };
+    }
+
+    function fireCurve() {
+      if (gameOver || currentTurnIndex !== 0 || !currentExpression.trim()) return;
+      const exprFunc = parseExpression(currentExpression);
+      if (!exprFunc) {
+        alert('函数表达式无效，请检查语法。');
+        return;
+      }
+      const originRole = turnOrder[currentTurnIndex];
+      const { points, destroyed } = sampleCurveWithObstacles(exprFunc, originRole);
+      if (points.length < 2) {
+        alert('函数在可视范围内无法绘制或被完全阻挡。');
+        return;
+      }
+      const hitEnemies = [];
+      enemies.forEach(enemy => {
+        if (!enemy.alive) return;
+        const localX = enemy.x - originRole.x;
+        const localY = enemy.y - originRole.y;
+        const dist = distancePointToCurve(localX, localY, points);
+        if (dist <= CURVE_HIT_WIDTH + CHAR_RADIUS) {
+          hitEnemies.push(enemy);
+        }
+      });
+      hitEnemies.forEach(enemy => { enemy.hp = Math.max(0, enemy.hp - 1); });
+
+      activeCurve = { points, originRole };
+      disableControls();
+      drawAll();
+
+      let msg = '';
+      if (destroyed.length > 0) msg += `💥 摧毁了 ${destroyed.length} 个障碍！ `;
+      if (hitEnemies.length > 0) msg += `命中 ${hitEnemies.length} 个敌人！`;
+      else if (destroyed.length === 0) msg = '💨 未命中任何目标';
+      turnIndicator.textContent = msg || '💨 未命中任何目标';
+
+      enemies.forEach(e => { if (e.hp <= 0) e.alive = false; });
+      updateHpDisplay();
+
+      if (curveTimer) clearTimeout(curveTimer);
+      curveTimer = setTimeout(() => {
+        activeCurve = null;
+        clearInput();
+        turnIndicator.textContent = '';
+        checkGameOver();
+        if (!gameOver) nextTurn();
+        enableControlsIfPlayerTurn();
+        drawAll();
+      }, 1200);
+    }
+
+    function enemyTurn() {
+      if (gameOver) return;
+      const enemy = turnOrder[currentTurnIndex];
+      if (!enemy || enemy.type !== 'enemy') return;
+      turnIndicator.textContent = `👾 敌人${getEnemyIndex(enemy)+1} 回合：思考中...`;
+      disableControls();
+      if (curveTimer) clearTimeout(curveTimer);
+      curveTimer = setTimeout(() => {
+        enemyFireCurve(enemy);
+      }, 400);
+    }
+
+    function generateEnemyFunction(enemy, target) {
+      const dx = target.x - enemy.x;
+      const dy = target.y - enemy.y;
+      const type = Math.random();
+      let expr = '';
+      if (type < 0.5 && Math.abs(dx) > 0.5) {
+        const k = dy / dx;
+        expr = `${k}*x`;
+      } else {
+        const a = (Math.random() * 0.6 + 0.1) * (Math.random() > 0.5 ? 1 : -1);
+        const dxPart = dx >= 0 ? `-${dx}` : `+${-dx}`;
+        expr = `${a}*(x${dxPart})^2`;
+        if (dy !== 0) {
+          expr += dy >= 0 ? `+${dy}` : `${dy}`;
+        }
+      }
+      expr = expr.replace(/\+\-/g, '-').replace(/\-\+/g, '-').replace(/\+\+/g, '+');
+      return expr;
+    }
+
+    function enemyFireCurve(enemy) {
+      if (gameOver) return;
+      const exprStr = generateEnemyFunction(enemy, player);
+      if (!exprStr) {
+        turnIndicator.textContent = `👾 敌人${getEnemyIndex(enemy)+1} 无法攻击...`;
+        if (curveTimer) clearTimeout(curveTimer);
+        curveTimer = setTimeout(() => {
+          turnIndicator.textContent = '';
+          if (!gameOver) nextTurn();
+          enableControlsIfPlayerTurn();
+          drawAll();
+        }, 800);
+        return;
+      }
+
+      const exprFunc = parseExpression(exprStr);
+      if (!exprFunc) {
+        turnIndicator.textContent = `👾 敌人${getEnemyIndex(enemy)+1} 攻击出错...`;
+        if (curveTimer) clearTimeout(curveTimer);
+        curveTimer = setTimeout(() => {
+          turnIndicator.textContent = '';
+          if (!gameOver) nextTurn();
+          enableControlsIfPlayerTurn();
+          drawAll();
+        }, 800);
+        return;
+      }
+
+      const { points, destroyed } = sampleCurveWithObstacles(exprFunc, enemy);
+      if (points.length < 2) {
+        turnIndicator.textContent = `👾 敌人${getEnemyIndex(enemy)+1} 攻击被完全阻挡...`;
+        if (curveTimer) clearTimeout(curveTimer);
+        curveTimer = setTimeout(() => {
+          turnIndicator.textContent = '';
+          if (!gameOver) nextTurn();
+          enableControlsIfPlayerTurn();
+          drawAll();
+        }, 800);
+        return;
+      }
+
+      const localX = player.x - enemy.x;
+      const localY = player.y - enemy.y;
+      const dist = distancePointToCurve(localX, localY, points);
+      let playerHit = false;
+      if (dist <= CURVE_HIT_WIDTH + CHAR_RADIUS) {
+        player.hp = Math.max(0, player.hp - 1);
+        playerHit = true;
+        updateHpDisplay();
+      }
+
+      activeCurve = { points, originRole: enemy };
+      drawAll();
+
+      let msg = `👾 敌人${getEnemyIndex(enemy)+1} 发射了函数！`;
+      if (destroyed.length > 0) msg += ` 摧毁${destroyed.length}障碍`;
+      if (playerHit) msg += ` 💔 玩家被击中！`;
+      else msg += ` 未命中`;
+      turnIndicator.textContent = msg;
+
+      if (curveTimer) clearTimeout(curveTimer);
+      curveTimer = setTimeout(() => {
+        activeCurve = null;
+        turnIndicator.textContent = '';
+        if (!player.alive) {
+          gameOver = true;
+          turnIndicator.textContent = '💀 你被击败了... 游戏结束';
+          disableControls();
+          drawAll();
+          return;
+        }
+        checkGameOver();
+        if (!gameOver) nextTurn();
+        enableControlsIfPlayerTurn();
+        drawAll();
+      }, 1200);
+    }
+
+    function getEnemyIndex(enemy) {
+      return enemies.findIndex(e => e === enemy);
+    }
+
+    function nextTurn() {
+      activeCurve = null;
+      updateTurnOrder();
+      if (turnOrder.length === 0) return;
+      currentTurnIndex = (currentTurnIndex + 1) % turnOrder.length;
+      const currentRole = turnOrder[currentTurnIndex];
+      turnIndicator.textContent = currentRole.type === 'player' ? '🔵 你的回合' : `👾 敌人${getEnemyIndex(currentRole)+1} 回合`;
+      if (currentRole.type === 'enemy') enemyTurn();
+      else enableControlsIfPlayerTurn();
+      drawAll();
+    }
+
+    function updateTurnOrder() {
+      turnOrder = [];
+      if (player.alive) turnOrder.push(player);
+      enemies.forEach(e => { if (e.alive) turnOrder.push(e); });
+      turnOrder.sort((a, b) => {
+        if (a.type === 'player') return -1;
+        if (b.type === 'player') return 1;
+        return enemies.indexOf(a) - enemies.indexOf(b);
+      });
+    }
+
+    function enableControlsIfPlayerTurn() {
+      if (gameOver) { disableControls(); return; }
+      if (turnOrder[currentTurnIndex]?.type === 'player') {
+        fireBtn.disabled = false;
+        toggleKeypadBtn.disabled = false;
+      } else {
+        disableControls();
+      }
+    }
+
+    function disableControls() {
+      fireBtn.disabled = true;
+      toggleKeypadBtn.disabled = true;
+      keypadPanel.classList.remove('show');
+    }
+
+    function checkGameOver() {
+      if (!player.alive) {
+        gameOver = true;
+        turnIndicator.textContent = '💀 你被击败了... 游戏结束';
+        disableControls();
+        return true;
+      }
+      if (enemies.length > 0 && enemies.every(e => !e.alive)) {
+        gameOver = true;
+        turnIndicator.textContent = '🏆 胜利！所有敌人已被消灭！';
+        disableControls();
+        return true;
+      }
+      return false;
+    }
+
+    function updateHpDisplay() {
+      playerHpText.textContent = `${player.hp}/${player.maxHp}`;
+      let html = '';
+      enemies.forEach((enemy, idx) => {
+        if (enemy.alive) html += `<div class="hp-bar">👾 敌人${idx+1} HP: ${enemy.hp}/${enemy.maxHp}</div>`;
+      });
+      enemyHpListDiv.innerHTML = html;
+    }
+
+    function drawGridAndAxes(ctx, origin) {
+      const scaleX = MAIN_CANVAS_WIDTH / viewW;
+      const scaleY = MAIN_CANVAS_HEIGHT / viewH;
+      const leftLocal = (0 - originPixelX) / scaleX;
+      const rightLocal = (MAIN_CANVAS_WIDTH - originPixelX) / scaleX;
+      const topLocal = (originPixelY - 0) / scaleY;
+      const bottomLocal = (originPixelY - MAIN_CANVAS_HEIGHT) / scaleY;
+
+      const approxGridSize = viewW / 10;
+      let gridStep = 1;
+      if (approxGridSize > 5) gridStep = 5;
+      if (approxGridSize > 15) gridStep = 10;
+      if (approxGridSize > 30) gridStep = 20;
+      if (approxGridSize > 60) gridStep = 50;
+
+      ctx.strokeStyle = '#ddd';
+      ctx.lineWidth = 0.6;
+      for (let lx = Math.floor(leftLocal / gridStep) * gridStep; lx <= rightLocal; lx += gridStep) {
+        const canvasX = originPixelX + lx * scaleX;
+        ctx.beginPath();
+        ctx.moveTo(canvasX, 0);
+        ctx.lineTo(canvasX, MAIN_CANVAS_HEIGHT);
+        ctx.stroke();
+      }
+      for (let ly = Math.floor(bottomLocal / gridStep) * gridStep; ly <= topLocal; ly += gridStep) {
+        const canvasY = originPixelY - ly * scaleY;
+        ctx.beginPath();
+        ctx.moveTo(0, canvasY);
+        ctx.lineTo(MAIN_CANVAS_WIDTH, canvasY);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      const axisYCanvas = originPixelY;
+      ctx.beginPath(); ctx.moveTo(0, axisYCanvas); ctx.lineTo(MAIN_CANVAS_WIDTH, axisYCanvas); ctx.stroke();
+      const axisXCanvas = originPixelX;
+      ctx.beginPath(); ctx.moveTo(axisXCanvas, 0); ctx.lineTo(axisXCanvas, MAIN_CANVAS_HEIGHT); ctx.stroke();
+
+      ctx.fillStyle = '#555';
+      ctx.font = '11px "Segoe UI", Arial';
+      ctx.textAlign = 'center';
+      for (let lx = Math.floor(leftLocal / gridStep) * gridStep; lx <= rightLocal; lx += gridStep) {
+        if (Math.abs(lx) < 0.001) continue;
+        ctx.fillText(lx, originPixelX + lx * scaleX, axisYCanvas - 6);
+      }
+      ctx.textAlign = 'left';
+      for (let ly = Math.floor(bottomLocal / gridStep) * gridStep; ly <= topLocal; ly += gridStep) {
+        if (Math.abs(ly) < 0.001) continue;
+        ctx.fillText(ly, axisXCanvas + 6, originPixelY - ly * scaleY + 4);
+      }
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 13px "Segoe UI"';
+      ctx.fillText('0', axisXCanvas + 8, axisYCanvas - 8);
+    }
+
+    function drawObstacles(ctx, origin) {
+      ctx.fillStyle = '#666';
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      for (let obs of obstacles) {
+        if (!obs.alive) continue;
+        const topLeft = worldToCanvas(obs.x, obs.y + obs.h, origin);
+        const bottomRight = worldToCanvas(obs.x + obs.w, obs.y, origin);
+        const width = bottomRight.x - topLeft.x;
+        const height = bottomRight.y - topLeft.y;
+        ctx.fillRect(topLeft.x, topLeft.y, width, height);
+        ctx.strokeRect(topLeft.x, topLeft.y, width, height);
+      }
+    }
+
+    function drawCharacter(ctx, worldX, worldY, origin, type) {
+      const { x: cx, y: cy } = worldToCanvas(worldX, worldY, origin);
+      const radius = 14;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI*2);
+      ctx.fillStyle = type === 'player' ? '#3b82f6' : '#ef4444';
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      const eyeOffsetX = 5, eyeOffsetY = 5, eyeRadius = 4;
+      ctx.fillStyle = 'white';
+      ctx.beginPath(); ctx.arc(cx - eyeOffsetX, cy - eyeOffsetY, eyeRadius, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + eyeOffsetX, cy - eyeOffsetY, eyeRadius, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.arc(cx - eyeOffsetX + 1, cy - eyeOffsetY - 1, 1.8, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + eyeOffsetX + 1, cy - eyeOffsetY - 1, 1.8, 0, Math.PI*2); ctx.fill();
+    }
+
+    function drawCurve(ctx, points, origin) {
+      if (!points || points.length < 2) return;
+      ctx.beginPath();
+      ctx.strokeStyle = '#e07b00';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#cc6600';
+      ctx.shadowBlur = 6;
+      let first = true;
+      points.forEach(pt => {
+        const { x: cx, y: cy } = worldToCanvas(origin.x + pt.x, origin.y + pt.y, origin);
+        if (first) { ctx.moveTo(cx, cy); first = false; }
+        else ctx.lineTo(cx, cy);
+      });
+      ctx.stroke();
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
+
+    function drawMinimap() {
+      const w = minimapCanvas.width, h = minimapCanvas.height;
+      minimapCtx.clearRect(0, 0, w, h);
+      minimapCtx.fillStyle = '#fafaf5';
+      minimapCtx.fillRect(0, 0, w, h);
+      const mapScale = w / WORLD_SIZE;
+
+      minimapCtx.strokeStyle = '#ddd';
+      minimapCtx.lineWidth = 0.5;
+      for (let val = WORLD_MIN; val <= WORLD_MAX; val += 10) {
+        const canvasX = (val - WORLD_MIN) * mapScale;
+        minimapCtx.beginPath(); minimapCtx.moveTo(canvasX, 0); minimapCtx.lineTo(canvasX, h); minimapCtx.stroke();
+        const canvasY = h - (val - WORLD_MIN) * mapScale;
+        minimapCtx.beginPath(); minimapCtx.moveTo(0, canvasY); minimapCtx.lineTo(w, canvasY); minimapCtx.stroke();
+      }
+
+      minimapCtx.strokeStyle = '#666';
+      minimapCtx.lineWidth = 1.5;
+      const originX = (0 - WORLD_MIN) * mapScale;
+      const originY = h - (0 - WORLD_MIN) * mapScale;
+      minimapCtx.beginPath(); minimapCtx.moveTo(originX, 0); minimapCtx.lineTo(originX, h); minimapCtx.stroke();
+      minimapCtx.beginPath(); minimapCtx.moveTo(0, originY); minimapCtx.lineTo(w, originY); minimapCtx.stroke();
+
+      minimapCtx.fillStyle = '#555';
+      for (let obs of obstacles) {
+        if (!obs.alive) continue;
+        const left = (obs.x - WORLD_MIN) * mapScale;
+        const right = (obs.x + obs.w - WORLD_MIN) * mapScale;
+        const top = h - (obs.y + obs.h - WORLD_MIN) * mapScale;
+        const bottom = h - (obs.y - WORLD_MIN) * mapScale;
+        minimapCtx.fillRect(left, top, right - left, bottom - top);
+      }
+
+      if (activeCurve) {
+        minimapCtx.save();
+        minimapCtx.strokeStyle = '#e07b00';
+        minimapCtx.lineWidth = 1.8;
+        minimapCtx.beginPath();
+        let first = true;
+        activeCurve.points.forEach(pt => {
+          const wx = activeCurve.originRole.x + pt.x;
+          const wy = activeCurve.originRole.y + pt.y;
+          const px = (wx - WORLD_MIN) * mapScale;
+          const py = h - (wy - WORLD_MIN) * mapScale;
+          if (first) { minimapCtx.moveTo(px, py); first = false; }
+          else minimapCtx.lineTo(px, py);
+        });
+        minimapCtx.stroke();
+        minimapCtx.restore();
+      }
+
+      if (turnOrder.length && currentTurnIndex >= 0) {
+        const origin = turnOrder[currentTurnIndex];
+        const topLeft = canvasToWorld(0, 0, origin);
+        const bottomRight = canvasToWorld(MAIN_CANVAS_WIDTH, MAIN_CANVAS_HEIGHT, origin);
+        const viewLeft = Math.min(topLeft.x, bottomRight.x);
+        const viewRight = Math.max(topLeft.x, bottomRight.x);
+        const viewBottom = Math.min(topLeft.y, bottomRight.y);
+        const viewTop = Math.max(topLeft.y, bottomRight.y);
+
+        const mapLeft = (viewLeft - WORLD_MIN) * mapScale;
+        const mapRight = (viewRight - WORLD_MIN) * mapScale;
+        const mapTop = h - (viewTop - WORLD_MIN) * mapScale;
+        const mapBottom = h - (viewBottom - WORLD_MIN) * mapScale;
+        minimapCtx.strokeStyle = '#e07b00';
+        minimapCtx.lineWidth = 2;
+        minimapCtx.strokeRect(mapLeft, mapTop, mapRight - mapLeft, mapBottom - mapTop);
+      }
+
+      function drawMiniChar(wx, wy, color) {
+        const cx = (wx - WORLD_MIN) * mapScale;
+        const cy = h - (wy - WORLD_MIN) * mapScale;
+        minimapCtx.fillStyle = color;
+        minimapCtx.beginPath(); minimapCtx.arc(cx, cy, 4, 0, 2*Math.PI); minimapCtx.fill();
+        minimapCtx.strokeStyle = '#333'; minimapCtx.lineWidth = 0.8; minimapCtx.stroke();
+      }
+      if (player.alive) drawMiniChar(player.x, player.y, '#3b82f6');
+      enemies.forEach(e => { if (e.alive) drawMiniChar(e.x, e.y, '#ef4444'); });
+    }
+
+    function drawAll() {
+      mainCtx.clearRect(0, 0, MAIN_CANVAS_WIDTH, MAIN_CANVAS_HEIGHT);
+      if (!turnOrder.length || currentTurnIndex < 0) return;
+      const origin = turnOrder[currentTurnIndex];
+      drawGridAndAxes(mainCtx, origin);
+      drawObstacles(mainCtx, origin);
+      if (activeCurve && activeCurve.originRole === origin) {
+        drawCurve(mainCtx, activeCurve.points, origin);
+      }
+      if (player.alive) drawCharacter(mainCtx, player.x, player.y, origin, 'player');
+      enemies.forEach(e => { if (e.alive) drawCharacter(mainCtx, e.x, e.y, origin, 'enemy'); });
+      drawMinimap();
+    }
+
+    function updateMouseCoords(e) {
+      if (!turnOrder.length || currentTurnIndex < 0) return;
+      const rect = mainCanvas.getBoundingClientRect();
+      const scaleX = mainCanvas.width / rect.width;
+      const scaleY = mainCanvas.height / rect.height;
+      const canvasX = (e.clientX - rect.left) * scaleX;
+      const canvasY = (e.clientY - rect.top) * scaleY;
+      const origin = turnOrder[currentTurnIndex];
+      const worldPos = canvasToWorld(canvasX, canvasY, origin);
+      const localX = worldPos.x - origin.x;
+      const localY = worldPos.y - origin.y;
+      mouseCoordsDiv.textContent = `鼠标坐标: (${localX.toFixed(2)}, ${localY.toFixed(2)})`;
+    }
+
+    mainCanvas.addEventListener('mousemove', (e) => {
+      updateMouseCoords(e);
+      if (isDragging) {
+        const rect = mainCanvas.getBoundingClientRect();
+        const scaleX = mainCanvas.width / rect.width;
+        const scaleY = mainCanvas.height / rect.height;
+        const currentCanvasX = (e.clientX - rect.left) * scaleX;
+        const currentCanvasY = (e.clientY - rect.top) * scaleY;
+        originPixelX = dragStartOriginX + (currentCanvasX - dragStartMouseX);
+        originPixelY = dragStartOriginY + (currentCanvasY - dragStartMouseY);
+        drawAll();
+      }
+    });
+
+    mainCanvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) {
+        const rect = mainCanvas.getBoundingClientRect();
+        const scaleX = mainCanvas.width / rect.width;
+        const scaleY = mainCanvas.height / rect.height;
+        dragStartMouseX = (e.clientX - rect.left) * scaleX;
+        dragStartMouseY = (e.clientY - rect.top) * scaleY;
+        dragStartOriginX = originPixelX;
+        dragStartOriginY = originPixelY;
+        isDragging = true;
+        mainCanvas.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        mainCanvas.style.cursor = 'default';
+      }
+    });
+
+    mainCanvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (gameOver) return;
+      const delta = e.deltaY > 0 ? 1.2 : 0.8;
+      let newViewW = viewW * delta;
+      newViewW = Math.max(MIN_VIEW_W, Math.min(MAX_VIEW_W, newViewW));
+      viewW = newViewW;
+      viewH = viewW * (DEFAULT_VIEW_H / DEFAULT_VIEW_W);
+      drawAll();
+    });
+
+    mainCanvas.addEventListener('mouseleave', () => {
+      mouseCoordsDiv.textContent = '鼠标坐标: (——, ——)';
+    });
+
+    toggleKeypadBtn.addEventListener('click', () => {
+      if (gameOver || currentTurnIndex !== 0) return;
+      keypadPanel.classList.toggle('show');
+    });
+
+    fireBtn.addEventListener('click', () => {
+      if (gameOver || currentTurnIndex !== 0) return;
+      fireCurve();
+      keypadPanel.classList.remove('show');
+    });
+
+    function generateObstacles() {
+      obstacles = [];
+      const allRoles = [player, ...enemies];
+      const clusterCenters = [];
+      for (let i = 0; i < allRoles.length; i++) {
+        for (let j = i+1; j < allRoles.length; j++) {
+          const a = allRoles[i], b = allRoles[j];
+          const midX = (a.x + b.x) / 2;
+          const midY = (a.y + b.y) / 2;
+          clusterCenters.push({x: midX, y: midY});
+          for (let k = 0; k < 2; k++) {
+            const t = Math.random();
+            const randX = a.x + (b.x - a.x) * t + (Math.random() - 0.5) * 15;
+            const randY = a.y + (b.y - a.y) * t + (Math.random() - 0.5) * 15;
+            clusterCenters.push({x: randX, y: randY});
+          }
+        }
+      }
+      for (let i = 0; i < 8; i++) {
+        clusterCenters.push({
+          x: Math.random() * WORLD_SIZE + WORLD_MIN,
+          y: Math.random() * WORLD_SIZE + WORLD_MIN
+        });
+      }
+      for (let center of clusterCenters) {
+        const clusterSize = 4 + Math.floor(Math.random() * 5);
+        for (let n = 0; n < clusterSize; n++) {
+          const offsetX = (Math.random() - 0.5) * 4;
+          const offsetY = (Math.random() - 0.5) * 4;
+          const x = Math.round(center.x + offsetX);
+          const y = Math.round(center.y + offsetY);
+          if (x < WORLD_MIN || x >= WORLD_MAX || y < WORLD_MIN || y >= WORLD_MAX) continue;
+          const tooClose = allRoles.some(r => Math.hypot(x - r.x, y - r.y) < 2);
+          if (tooClose) continue;
+          obstacles.push({
+            x: x, y: y,
+            w: 1, h: 1,
+            alive: true
+          });
+        }
+      }
+    }
+
+    function randomPosition(avoidList, minDist = 5) {
+      for (let attempts = 0; attempts < 500; attempts++) {
+        const x = Math.random() * (WORLD_MAX - WORLD_MIN) + WORLD_MIN;
+        const y = Math.random() * (WORLD_MAX - WORLD_MIN) + WORLD_MIN;
+        if (avoidList.every(role => Math.hypot(x - role.x, y - role.y) >= minDist)) {
+          return {x, y};
+        }
+      }
+      return {x: WORLD_MIN + 10, y: WORLD_MIN + 10};
+    }
+
+    function startGame() {
+      gameOver = false;
+      activeCurve = null;
+      if (curveTimer) clearTimeout(curveTimer);
+      viewW = DEFAULT_VIEW_W;
+      viewH = DEFAULT_VIEW_H;
+      originPixelX = MAIN_CANVAS_WIDTH / 2;
+      originPixelY = MAIN_CANVAS_HEIGHT / 2;
+      currentExpression = '';
+      updateInputDisplay();
+
+      player.hp = PLAYER_MAX_HP;
+      player.alive = true;
+      const playerPos = randomPosition([], 0);
+      player.x = playerPos.x;
+      player.y = playerPos.y;
+
+      const enemyCount = Math.floor(Math.random() * 3) + 1;
+      enemies = [];
+      const avoidList = [player];
+      for (let i = 0; i < enemyCount; i++) {
+        const pos = randomPosition(avoidList, 8);
+        enemies.push({
+          x: pos.x, y: pos.y,
+          hp: ENEMY_MAX_HP,
+          maxHp: ENEMY_MAX_HP,
+          type: 'enemy',
+          alive: true
+        });
+        avoidList.push(enemies[enemies.length-1]);
+      }
+
+      generateObstacles();
+      updateTurnOrder();
+      currentTurnIndex = 0;
+      turnIndicator.textContent = '🔵 你的回合';
+      enableControlsIfPlayerTurn();
+      updateHpDisplay();
+      keypadPanel.classList.remove('show');
+      drawAll();
+    }
+
+    buildKeypad();
+    startGame();
+  })();
+</script>
+</body>
+</html>
